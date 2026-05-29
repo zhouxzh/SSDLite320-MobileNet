@@ -23,7 +23,7 @@
 - 初始化：卷积层使用 `normal_(mean=0, std=0.03)`
 - 支持的主干：`MobileNet v1 / v2 / v3 / v4` 多个具体变体，便于做系统对比实验
 
-对应代码：`ssdlite/model.py`
+对应代码：`ssdlite320/model.py`
 
 ### 先验框（Default Boxes）
 - 特征层尺寸：`[20, 10, 5, 3, 2, 1]`
@@ -31,7 +31,7 @@
 - scale 范围：默认 `min_ratio=0.1`, `max_ratio=0.9`，可通过训练参数覆盖
 - 生成方式：与 torchvision `DefaultBoxGenerator` 的 ratio/scale 思路对齐
 
-对应代码：`ssdlite/encoder.py` 中 `dboxes320_coco()`
+对应代码：`ssdlite320/encoder.py` 中 `dboxes320_coco()`
 
 ### 训练策略（当前默认）
 - 优化器：`SGD(momentum=0.9)` + Tencent trick（BN 和 bias 不做 weight decay）
@@ -44,17 +44,17 @@
 - 早停：`patience=20`，`min_delta=1e-4`；默认会根据余弦退火进入稳定阶段的时间自动选择合适的起始 epoch
 - 每轮验证：默认 `eval_interval=1`
 - 保存策略：
-  - 每轮保存：`checkpoints/ssd_{backbone}_{epoch}.pth`
-  - 最优保存：`checkpoints/ssd_{backbone}_best.pth`
+  - 续训保存：`checkpoints/ssd320_{backbone}_last.pth`，每轮覆盖更新
+  - 最优保存：`checkpoints/ssd320_{backbone}_best.pth`
 
-对应代码：`ssdlite/train.py`
+对应代码：`ssdlite320/train.py`
 
 ### 一轮训练是怎么组织的
 当前默认配置下，训练流程可以直接理解成下面这条主线：
 
 1. 先根据 batch size 和 world size 计算线性缩放后的有效学习率。
 2. 构建 `SSD320`、`Loss`、`Encoder` 和 TensorBoard writer。
-3. 如果启用了 `--restart`，优先从最新 checkpoint 恢复模型权重。
+3. 如果启用了 `--restart`，优先从 last checkpoint 恢复模型权重。
 4. 如果 `--freeze-backbone-epochs > 0`，先运行“冻结 backbone、只训练检测头”的阶段。
 5. 进入全量训练阶段，对 backbone 和检测头一起优化。
 6. 如果显式设置了 `--freeze-warmup-epochs` 或 `--warmup-epochs`，会先做标准 `LinearLR` warmup。
@@ -66,14 +66,14 @@
 
 ### 训练代码结构
 - `main.py`：统一入口，负责参数定义、参数校验、`train / val` 命令分发。
-- `ssdlite/runtime.py`：承接 DDP 初始化与销毁、数据加载、验证资源构建、checkpoint 查找和 ONNX 导出等工程性辅助逻辑。
-- `ssdlite/train.py`：只保留“训练过程本身”的逻辑，例如优化器构建、epoch 训练、验证、保存、早停。
-- `ssdlite/eval.py`：统一放 PyTorch 验证与 ONNX 验证逻辑，包括可视化、COCO 指标计算和 CSV 导出。
-- `ssdlite/utils.py`：集中放共享的可视化、类别名解析和验证指标整理逻辑。
-- `ssdlite/data_hf.py`：把“数据下载、标注解析、训练增强、验证缩放”拆成独立接口，避免把数据细节堆在 `__getitem__` 里。
-- `ssdlite/model.py`：把“backbone 名称映射、额外特征层、预测头、loss”拆成几块稳定组件，便于单独讲解。
+- `ssdlite320/runtime.py`：承接 DDP 初始化与销毁、数据加载、验证资源构建、checkpoint 查找和 ONNX 导出等工程性辅助逻辑。
+- `ssdlite320/train.py`：只保留“训练过程本身”的逻辑，例如优化器构建、epoch 训练、验证、保存、早停。
+- `ssdlite320/eval.py`：统一放 PyTorch 验证与 ONNX 验证逻辑，包括可视化、COCO 指标计算和 CSV 导出。
+- `ssdlite320/utils.py`：集中放共享的可视化、类别名解析和验证指标整理逻辑。
+- `ssdlite320/data_hf.py`：把“数据下载、标注解析、训练增强、验证缩放”拆成独立接口，避免把数据细节堆在 `__getitem__` 里。
+- `ssdlite320/model.py`：把“backbone 名称映射、额外特征层、预测头、loss”拆成几块稳定组件，便于单独讲解。
 - `TrainingContext`：集中保存跨阶段共享的运行时对象，避免把 `model / writer / criterion / device` 塞进零散字典中。
-- `ssdlite/encoder.py`：只负责 default boxes、编码和解码，不再混入训练可视化逻辑。
+- `ssdlite320/encoder.py`：只负责 default boxes、编码和解码，不再混入训练可视化逻辑。
 
 这套划分有一个明确标准：
 - 如果一个辅助函数只是机械地包了一行表达式，而且没有提供额外语义，一般直接内联。
@@ -145,7 +145,7 @@ TensorBoard 日志目录会自动带上 cosine 标签，例如 `logs/.../cosine_
 - 默认导出训练结束时当前内存模型对应的 ONNX。
 - 如果需要显式指定导出来源，可使用 `--export-onnx-from-best-checkpoint`。
 
-### 从最新 checkpoint 续训
+### 从 last checkpoint 续训
 ```bash
 python main.py train --device cuda --restart
 ```
@@ -192,7 +192,7 @@ python main.py val --backbone mobilenetv4_conv_small --provider auto --csv-file 
 ```
 
 这条命令会：
-- 读取 `weights/ssd_{backbone}.onnx`
+- 读取 `weights/ssd320_{backbone}.onnx`
 - 优先复用 `data/coco_gt.json` 作为 COCO Ground Truth 缓存
 - 固定在 COCO 验证集上计算 `mAP / AP50 / AP75 / small / medium / large`
 - 把结果追加写入 `CSV`，方便比较不同导出模型
@@ -201,7 +201,7 @@ python main.py val --backbone mobilenetv4_conv_small --provider auto --csv-file 
 
 如需显式指定 ONNX 文件：
 ```bash
-python main.py val --onnx-path weights/ssd_mobilenetv4_conv_small.onnx --provider cuda --num-visualizations 20
+python main.py val --onnx-path weights/ssd320_mobilenetv4_conv_small.onnx --provider cuda --num-visualizations 20
 ```
 
 ## 4. 当前默认参数（main.py train）
@@ -253,11 +253,12 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 ## 5. 导出 ONNX
 
 训练模式默认会在结束后自动导出 ONNX：
-- `weights/ssd_{backbone}.onnx`
+- `weights/ssd320_{backbone}.onnx`
+- `mobilenetv4_hybrid_*` 系列会自动切到 opset 14，以支持 `scaled_dot_product_attention`
 
 目录约定：
 - `weights/`：保存导出的 ONNX 模型及相关推理文件。
-- `checkpoints/`：保存训练过程中的 epoch checkpoint 和 best checkpoint。
+- `checkpoints/`：只保存 `last` checkpoint 和 `best` checkpoint。
 
 如果只想切换导出来源，可使用 `--export-onnx-from-best-checkpoint`，让导出基于 best checkpoint。
 
@@ -309,15 +310,15 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 
 建议阅读顺序：
 1. 先看 `main.py`，理解整个训练/验证入口如何组织。
-2. 再看 `ssdlite/train.py`，重点看两个训练阶段是怎样复用同一套 epoch 执行流程的。
-3. 然后看 `ssdlite/eval.py`，把训练期验证和 ONNX 验证当成同一个“预测 -> COCO 指标”流程来理解。
-4. 最后看 `ssdlite/data_hf.py` 和 `ssdlite/runtime.py`，补齐数据与工程辅助层细节。
+2. 再看 `ssdlite320/train.py`，重点看两个训练阶段是怎样复用同一套 epoch 执行流程的。
+3. 然后看 `ssdlite320/eval.py`，把训练期验证和 ONNX 验证当成同一个“预测 -> COCO 指标”流程来理解。
+4. 最后看 `ssdlite320/data_hf.py` 和 `ssdlite320/runtime.py`，补齐数据与工程辅助层细节。
 
 - `main.py`：统一训练/验证入口，参数、校验和命令分发都在这里，适合初学者先看
-- `ssdlite/runtime.py`：DDP、DataLoader、验证资源、checkpoint 和导出等工程辅助逻辑
-- `ssdlite/train.py`：训练循环、调度、早停、checkpoint 保存
-- `ssdlite/model.py`：MobileNet + SSDLite320 模型定义
-- `ssdlite/encoder.py`：编码解码、IoU、Default Boxes
-- `ssdlite/data_hf.py`：COCO 数据集封装、数据增强与 DataLoader 构建
-- `ssdlite/utils.py`：共享工具函数，例如可视化、类别名解析、验证指标整理
-- `ssdlite/eval.py`：统一评估层，包含训练期验证和 ONNX 验证
+- `ssdlite320/runtime.py`：DDP、DataLoader、验证资源、checkpoint 和导出等工程辅助逻辑
+- `ssdlite320/train.py`：训练循环、调度、早停、checkpoint 保存
+- `ssdlite320/model.py`：MobileNet + SSDLite320 模型定义
+- `ssdlite320/encoder.py`：编码解码、IoU、Default Boxes
+- `ssdlite320/data_hf.py`：COCO 数据集封装、数据增强与 DataLoader 构建
+- `ssdlite320/utils.py`：共享工具函数，例如可视化、类别名解析、验证指标整理
+- `ssdlite320/eval.py`：统一评估层，包含训练期验证和 ONNX 验证

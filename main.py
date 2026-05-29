@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ssdlite.config import DEFAULT_IMAGE_SIZE, DEFAULT_MODEL_REPO_ID
-from ssdlite.runtime import (
+from ssdlite320.config import DEFAULT_IMAGE_SIZE, DEFAULT_MODEL_REPO_ID
+from ssdlite320.runtime import (
     build_validation_resources,
     export_onnx_model,
     find_best_checkpoint,
@@ -61,15 +61,15 @@ def build_train_parser(parser: argparse.ArgumentParser) -> None:
     core_group.add_argument("--pretrained-backbone", action=argparse.BooleanOptionalAction, default=True, help="Use timm pretrained backbone weights")
     core_group.add_argument("--epochs", type=int, default=400, help="Total training epochs")
     core_group.add_argument("--batch-size", type=int, default=64, help="Batch size per process; effective LR is scaled by batch_size * world_size")
-    core_group.add_argument("--lr", type=float, default=0.001, help="Base learning rate before linear scaling")
+    core_group.add_argument("--lr", type=float, default=0.003, help="Base learning rate before linear scaling")
     core_group.add_argument("--momentum", type=float, default=0.9, help="SGD momentum")
-    core_group.add_argument("--weight-decay", type=float, default=4e-5, help="Weight decay")
+    core_group.add_argument("--weight-decay", type=float, default=1e-4, help="Weight decay")
 
     schedule_group = parser.add_argument_group("schedule and validation")
     schedule_group.add_argument("--freeze-backbone-epochs", type=int, default=5, help="Freeze backbone for the first N epochs")
     schedule_group.add_argument("--freeze-warmup-epochs", type=int, default=1, help="Linear warmup epochs used only during the freeze-backbone phase")
     schedule_group.add_argument("--warmup-epochs", type=int, default=3, help="Linear warmup epochs for full-model training before cosine annealing")
-    schedule_group.add_argument("--hold-ratio", type=float, default=0.15, help="Constant-LR hold ratio applied to the remaining full-model epochs after warmup and before cosine annealing")
+    schedule_group.add_argument("--hold-ratio", type=float, default=0, help="Constant-LR hold ratio applied to the remaining full-model epochs after warmup and before cosine annealing")
     schedule_group.add_argument(
         "--cosine-min-lr-ratio",
         type=float,
@@ -95,7 +95,7 @@ def build_train_parser(parser: argparse.ArgumentParser) -> None:
     runtime_group = parser.add_argument_group("runtime and export")
     runtime_group.add_argument("--device", type=str, default="cuda", help="Device (cuda/cpu)")
     runtime_group.add_argument("--ddp", action=argparse.BooleanOptionalAction, default=True, help="Enable distributed data parallel")
-    runtime_group.add_argument("--restart", action="store_true", help="Resume training from the latest checkpoint")
+    runtime_group.add_argument("--restart", action="store_true", help="Resume training from the last checkpoint")
     runtime_group.add_argument(
         "--export-onnx-from-best-checkpoint",
         dest="export_onnx_from_best_checkpoint",
@@ -207,9 +207,9 @@ def run_train_command(args: argparse.Namespace) -> None:
 
     阅读顺序建议：
     1. 先看这里，了解命令入口做了哪些准备。
-    2. 再看 ssdlite.train.run_training_plan，了解训练阶段如何串起来。
+    2. 再看 ssdlite320.train.run_training_plan，了解训练阶段如何串起来。
     """
-    from ssdlite.train import run_training_plan, setup_training
+    from ssdlite320.train import run_training_plan, setup_training
 
     validate_train_args(args)
     args = initialize_distributed_runtime(args)
@@ -221,7 +221,7 @@ def run_train_command(args: argparse.Namespace) -> None:
     if args.export_onnx_from_best_checkpoint:
         best_checkpoint = find_best_checkpoint(args.backbone)
         if best_checkpoint is None:
-            raise FileNotFoundError(f"未找到 best checkpoint: checkpoints/ssd_{args.backbone}_best.pth")
+            raise FileNotFoundError(f"未找到 best checkpoint: checkpoints/ssd320_{args.backbone}_best.pth")
         train_state = setup_training(args, resume_checkpoint=best_checkpoint)
         if train_state.writer is not None:
             train_state.writer.close()
@@ -244,7 +244,7 @@ def run_train_command(args: argparse.Namespace) -> None:
 
 
 def run_val_command(args: argparse.Namespace) -> None:
-    from ssdlite.eval import evaluate_exported_onnx
+    from ssdlite320.eval import evaluate_exported_onnx
 
     validate_val_args(args)
     metrics = evaluate_exported_onnx(args)

@@ -12,19 +12,18 @@ LOG_DIR="${LOG_DIR:-logs/run_all_mobilenet}"
 mkdir -p "$LOG_DIR"
 
 DEFAULT_BACKBONES=(
-	"mobilenetv1_100"
-	"mobilenetv1_100h"
-	"mobilenetv1_125"
-	"mobilenetv2_050"
-	"mobilenetv2_075"
-	"mobilenetv2_100"
-	"mobilenetv2_140"
-	"mobilenetv3_small_100"
-	"mobilenetv3_large_100"
-	"mobilenetv3_large_150d"
-	"mobilenetv4_conv_small"
-	"mobilenetv4_conv_medium"
-	"mobilenetv4_conv_large"
+	# "mobilenetv1_100"
+	# "mobilenetv1_100h"
+	# "mobilenetv1_125"
+	# "mobilenetv2_050"
+	# "mobilenetv2_100"
+	# "mobilenetv2_140"
+	# "mobilenetv3_small_100"
+	# "mobilenetv3_large_100"
+	# "mobilenetv3_large_150d"
+	# "mobilenetv4_conv_small"
+	# "mobilenetv4_conv_medium"
+	# "mobilenetv4_conv_large"
 	"mobilenetv4_hybrid_medium"
 	"mobilenetv4_hybrid_large"
 )
@@ -55,6 +54,7 @@ for index in "${!BACKBONES[@]}"; do
 		main.py train \
 		--backbone "$backbone" \
 		--device cuda \
+		--restart \
 		--ddp 2>&1 | tee "$log_file"
 
 	echo "[$((index + 1))/${#BACKBONES[@]}] Finished: $backbone"

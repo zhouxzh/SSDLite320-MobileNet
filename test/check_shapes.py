@@ -2,7 +2,7 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
-from ssdlite.model import SSD320, MobileNet
+from ssdlite320.model import SSD320, MobileNet
 
 m = SSD320(backbone=MobileNet(backbone='mobilenetv4', weights='IMAGENET1K_V1'))
 m.eval()

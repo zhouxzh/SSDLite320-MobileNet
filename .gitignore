@@ -209,3 +209,5 @@ __marimo__/
 # checkpoint files
 *.pth
 *.onnx
+data/
+viz_results/

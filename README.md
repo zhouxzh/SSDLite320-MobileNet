@@ -121,7 +121,20 @@ pip install -r requirements.txt
 
 ---
 
-## 3. 训练命令
+## 3. 预训练模型下载
+
+如果想直接使用已经导出的模型，可以到 Hugging Face 仓库 `zhouxzh/SSDLite320` 下载：
+
+- 仓库地址：`https://huggingface.co/zhouxzh/SSDLite320`
+- 提供两种格式的模型文件：`ONNX` 和 `PyTorch .pth`
+
+其中：
+- `ONNX` 模型可直接用于 `python main.py val ...` 的 ONNX 验证流程。
+- `.pth` 模型适合继续作为 PyTorch 权重使用，例如做续训、导出或本地实验。
+
+---
+
+## 4. 训练命令
 
 统一入口：`main.py`
 
@@ -204,7 +217,7 @@ python main.py val --backbone mobilenetv4_conv_small --provider auto --csv-file 
 python main.py val --onnx-path weights/ssd320_mobilenetv4_conv_small.onnx --provider cuda --num-visualizations 20
 ```
 
-## 4. 当前默认参数（main.py train）
+## 5. 当前默认参数（main.py train）
 
 - `--batch-size 64`
 - `--epochs 300`
@@ -235,7 +248,7 @@ python main.py val --onnx-path weights/ssd320_mobilenetv4_conv_small.onnx --prov
 
 ---
 
-## 参数推荐表（双卡冲榜）
+## 6. 参数推荐表（双卡冲榜）
 
 | 场景 | 建议参数 | 说明 |
 |---|---|---|
@@ -250,7 +263,7 @@ python main.py val --onnx-path weights/ssd320_mobilenetv4_conv_small.onnx --prov
 torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs 5 --freeze-warmup-epochs 1 --warmup-epochs 3 --cosine-min-lr-ratio 0.02 --epochs 300 --patience 20
 ```
 
-## 5. 导出 ONNX
+## 7. 导出 ONNX
 
 训练模式默认会在结束后自动导出 ONNX：
 - `weights/ssd320_{backbone}.onnx`
@@ -262,7 +275,7 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 
 如果只想切换导出来源，可使用 `--export-onnx-from-best-checkpoint`，让导出基于 best checkpoint。
 
-## 6. COCO Ground Truth 缓存
+## 8. COCO Ground Truth 缓存
 
 训练期验证和 `val` 模式都会使用 `data/coco_gt.json` 作为 COCO Ground Truth 缓存。
 
@@ -274,7 +287,7 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 
 ---
 
-## 7. 常见问题
+## 9. 常见问题
 
 ### Q1: 想更快收敛，怎么调？
 - 保持 `--pretrained-backbone` 开启
@@ -306,7 +319,7 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 
 ---
 
-## 8. 主要代码文件
+## 10. 主要代码文件
 
 建议阅读顺序：
 1. 先看 `main.py`，理解整个训练/验证入口如何组织。

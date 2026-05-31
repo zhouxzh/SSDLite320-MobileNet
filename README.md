@@ -217,7 +217,31 @@ python main.py val --backbone mobilenetv4_conv_small --provider auto --csv-file 
 python main.py val --onnx-path weights/ssd320_mobilenetv4_conv_small.onnx --provider cuda --num-visualizations 20
 ```
 
-## 5. 当前默认参数（main.py train）
+## 5. 当前 ONNX 评估结果
+
+以下结果来自 `reports/onnx_validation_metrics_all_20260531_130552.csv`，评估时间为 `2026-05-31`，配置为 `provider=cuda`、`img_size=320`、`dbox_min_ratio=0.1`、`dbox_max_ratio=0.9`。
+
+| Backbone | mAP | AP50 | AP75 | APs | APm | APl | FPS total | FPS infer |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `mobilenetv4_hybrid_large` | 0.258 | 0.435 | 0.263 | 0.076 | 0.296 | 0.462 | 82.8 | 125.6 |
+| `mobilenetv4_hybrid_medium` | 0.258 | 0.430 | 0.264 | 0.067 | 0.290 | 0.468 | 83.4 | 129.8 |
+| `mobilenetv4_conv_large` | 0.252 | 0.424 | 0.258 | 0.067 | 0.290 | 0.452 | 96.9 | 153.2 |
+| `mobilenetv3_large_150d` | 0.247 | 0.416 | 0.254 | 0.066 | 0.279 | 0.448 | 93.9 | 152.6 |
+| `mobilenetv4_conv_medium` | 0.243 | 0.410 | 0.250 | 0.061 | 0.267 | 0.452 | 99.6 | 166.3 |
+| `mobilenetv1_125` | 0.233 | 0.402 | 0.234 | 0.060 | 0.261 | 0.422 | 100.1 | 184.2 |
+| `mobilenetv2_140` | 0.225 | 0.384 | 0.226 | 0.056 | 0.237 | 0.433 | 97.0 | 167.0 |
+| `mobilenetv1_100` | 0.221 | 0.378 | 0.223 | 0.047 | 0.241 | 0.410 | 101.6 | 192.7 |
+| `mobilenetv1_100h` | 0.220 | 0.381 | 0.221 | 0.051 | 0.240 | 0.410 | 97.0 | 184.9 |
+| `mobilenetv2_100` | 0.198 | 0.342 | 0.198 | 0.037 | 0.199 | 0.394 | 96.6 | 170.1 |
+| `mobilenetv3_large_100` | 0.197 | 0.345 | 0.196 | 0.037 | 0.198 | 0.397 | 97.2 | 171.3 |
+| `mobilenetv3_small_100` | 0.140 | 0.253 | 0.139 | 0.012 | 0.111 | 0.312 | 90.6 | 163.1 |
+| `mobilenetv2_050` | 0.120 | 0.220 | 0.113 | 0.010 | 0.087 | 0.267 | 90.2 | 162.9 |
+| `mobilenetv3_small_050` | 0.093 | 0.174 | 0.087 | 0.004 | 0.056 | 0.212 | 93.0 | 165.2 |
+| `mobilenetv4_conv_small` | 0.054 | 0.162 | 0.025 | 0.000 | 0.009 | 0.173 | 91.2 | 179.1 |
+
+其中 `FPS total` 包含评估流程中的前后处理开销，`FPS infer` 是 ONNX Runtime 推理吞吐。
+
+## 6. 当前默认参数（main.py train）
 
 - `--batch-size 64`
 - `--epochs 300`
@@ -248,7 +272,7 @@ python main.py val --onnx-path weights/ssd320_mobilenetv4_conv_small.onnx --prov
 
 ---
 
-## 6. 参数推荐表（双卡冲榜）
+## 7. 参数推荐表（双卡冲榜）
 
 | 场景 | 建议参数 | 说明 |
 |---|---|---|
@@ -263,7 +287,7 @@ python main.py val --onnx-path weights/ssd320_mobilenetv4_conv_small.onnx --prov
 torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs 5 --freeze-warmup-epochs 1 --warmup-epochs 3 --cosine-min-lr-ratio 0.02 --epochs 300 --patience 20
 ```
 
-## 7. 导出 ONNX
+## 8. 导出 ONNX
 
 训练模式默认会在结束后自动导出 ONNX：
 - `weights/ssd320_{backbone}.onnx`
@@ -275,7 +299,7 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 
 如果只想切换导出来源，可使用 `--export-onnx-from-best-checkpoint`，让导出基于 best checkpoint。
 
-## 8. COCO Ground Truth 缓存
+## 9. COCO Ground Truth 缓存
 
 训练期验证和 `val` 模式都会使用 `data/coco_gt.json` 作为 COCO Ground Truth 缓存。
 
@@ -287,7 +311,7 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 
 ---
 
-## 9. 常见问题
+## 10. 常见问题
 
 ### Q1: 想更快收敛，怎么调？
 - 保持 `--pretrained-backbone` 开启
@@ -319,7 +343,7 @@ torchrun --nproc_per_node=2 main.py train --device cuda --freeze-backbone-epochs
 
 ---
 
-## 10. 主要代码文件
+## 11. 主要代码文件
 
 建议阅读顺序：
 1. 先看 `main.py`，理解整个训练/验证入口如何组织。

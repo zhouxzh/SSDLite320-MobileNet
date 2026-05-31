@@ -15,6 +15,7 @@ from datasets import load_dataset
 from huggingface_hub import hf_hub_download
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
+from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -22,6 +23,22 @@ from .config import DEFAULT_DATASET_NAME, DEFAULT_MODEL_REPO_ID
 from .data_hf import IMAGENET_MEAN, IMAGENET_STD, get_coco_ground_truth, load_coco_ground_truth_api
 from .encoder import Encoder, dboxes320_coco
 from .utils import build_validation_metrics, extract_category_names, visualize_sample
+
+
+class ONNXEvalDataset(Dataset):
+    """Preprocess HF COCO validation images for fixed-batch ONNX evaluation."""
+
+    def __init__(self, val_dataset, img_size: int):
+        self.val_dataset = val_dataset
+        self.img_size = img_size
+
+    def __len__(self) -> int:
+        return len(self.val_dataset)
+
+    def __getitem__(self, index: int):
+        item = self.val_dataset[index]
+        image_tensor, _ = preprocess_onnx_image(item["image"], self.img_size)
+        return image_tensor, int(item["image_id"])
 
 
 # -----------------------------------------------------------------------------
@@ -379,6 +396,38 @@ def collect_onnx_predictions(args, val_dataset, session: ort.InferenceSession, e
     predictions: list[dict[str, int | float | list[float]]] = []
     image_ids: list[int] = []
     inference_time = 0.0
+    input_name = session.get_inputs()[0].name
+    num_workers = max(0, int(getattr(args, "num_workers", 0)))
+    preprocess_batch_size = max(1, int(getattr(args, "preprocess_batch_size", 1)))
+
+    if num_workers > 0:
+        eval_loader = DataLoader(
+            ONNXEvalDataset(val_dataset, args.img_size),
+            batch_size=preprocess_batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=False,
+            persistent_workers=True,
+            prefetch_factor=getattr(args, "prefetch_factor", 2),
+        )
+
+        with tqdm(total=len(val_dataset), desc="Evaluating ONNX") as progress:
+            for image_batch, batch_image_ids in eval_loader:
+                for image_tensor, image_id in zip(image_batch, batch_image_ids):
+                    step_start = time.time()
+                    locs, confs = session.run(["boxes", "scores"], {input_name: image_tensor.unsqueeze(0).numpy()})
+                    decoded = encoder.decode_batch(
+                        torch.from_numpy(locs),
+                        torch.from_numpy(confs),
+                        criteria=args.decode_iou_threshold,
+                        max_output=args.max_output,
+                    )[0]
+                    inference_time += time.time() - step_start
+                    image_id = int(image_id)
+                    image_ids.append(image_id)
+                    predictions.extend(build_coco_predictions(decoded, image_id, args.img_size, args.img_size))
+                    progress.update(1)
+        return predictions, image_ids, inference_time
 
     for item in tqdm(val_dataset, desc="Evaluating ONNX"):
         step_start = time.time()

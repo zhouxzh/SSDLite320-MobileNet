@@ -5,6 +5,7 @@ from typing import Literal
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torchvision.ops import nms
 
 
 BoxOrder = Literal["ltrb", "xywh"]
@@ -148,21 +149,19 @@ class Encoder:
             if candidate_scores.numel() == 0:
                 continue
 
-            _, sorted_indices = candidate_scores.sort(dim=0)
-            sorted_indices = sorted_indices[-max_num:]
-            selected_indices: list[int] = []
+            if candidate_scores.numel() > max_num:
+                _, sorted_indices = candidate_scores.sort(dim=0)
+                sorted_indices = sorted_indices[-max_num:]
+                candidate_boxes = candidate_boxes[sorted_indices, :]
+                candidate_scores = candidate_scores[sorted_indices]
 
-            while sorted_indices.numel() > 0:
-                current_index = sorted_indices[-1].item()
-                sorted_boxes = candidate_boxes[sorted_indices, :]
-                current_box = candidate_boxes[current_index, :].unsqueeze(dim=0)
-                iou_sorted = calc_iou_tensor(sorted_boxes, current_box).squeeze()
-                sorted_indices = sorted_indices[iou_sorted < criteria]
-                selected_indices.append(current_index)
+            selected_indices = nms(candidate_boxes, candidate_scores, criteria)
+            if selected_indices.numel() == 0:
+                continue
 
             bboxes_out.append(candidate_boxes[selected_indices, :])
             scores_out.append(candidate_scores[selected_indices])
-            labels_out.extend([class_index] * len(selected_indices))
+            labels_out.extend([class_index] * selected_indices.numel())
 
         if not bboxes_out:
             return (

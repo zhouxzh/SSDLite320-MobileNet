@@ -118,6 +118,9 @@ def build_val_parser(parser: argparse.ArgumentParser) -> None:
     eval_group.add_argument("--num-visualizations", type=int, default=0, help="How many validation images to save for visualization")
     eval_group.add_argument("--decode-iou-threshold", type=float, default=0.5, help="IoU threshold used during decode NMS")
     eval_group.add_argument("--max-output", type=int, default=200, help="Maximum predictions kept per image")
+    eval_group.add_argument("--num-workers", type=int, default=8, help="Number of workers for ONNX evaluation preprocessing")
+    eval_group.add_argument("--prefetch-factor", type=int, default=2, help="ONNX evaluation dataloader prefetch factor")
+    eval_group.add_argument("--preprocess-batch-size", type=int, default=16, help="Batch size used only for ONNX eval preprocessing workers")
 
     default_box_group = parser.add_argument_group("default boxes")
     default_box_group.add_argument("--dbox-min-ratio", type=float, default=0.1, help="Minimum default-box ratio used for decoding")
@@ -194,6 +197,12 @@ def validate_val_args(args: argparse.Namespace) -> None:
         raise ValueError("--decode-iou-threshold 必须满足 0 <= threshold <= 1。")
     if args.max_output <= 0:
         raise ValueError("--max-output 必须大于 0。")
+    if args.num_workers < 0:
+        raise ValueError("--num-workers 不能为负数。")
+    if args.prefetch_factor <= 0:
+        raise ValueError("--prefetch-factor 必须大于 0。")
+    if args.preprocess_batch_size <= 0:
+        raise ValueError("--preprocess-batch-size 必须大于 0。")
     validate_default_box_ratios(args.dbox_min_ratio, args.dbox_max_ratio)
 
 
